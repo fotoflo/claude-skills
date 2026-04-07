@@ -1,7 +1,7 @@
 ---
 name: transcribe
 description: Transcribe audio files (opus, ogg, mp3, wav, m4a) to text using local whisper-cpp. Use when the user says "transcribe", "what does this audio say", or provides an audio file.
-argument-hint: "<path-to-audio-file>"
+argument-hint: "<path-to-audio-file> | dl"
 ---
 
 Transcribe an audio file to text using local whisper-cpp.
@@ -23,13 +23,14 @@ Transcribe an audio file to text using local whisper-cpp.
 
 ## Steps
 
-### 1. Locate the audio file
+### 1. Locate the audio file(s)
 
-Use $ARGUMENTS as the file path. If not provided, ask the user.
+If $ARGUMENTS is `dl`:
+- Scan `~/Downloads/` for audio files (opus, ogg, mp3, wav, m4a) modified in the last 24 hours
+- List them with timestamps and sizes, then transcribe each one
+- Process newest first
 
-Common WhatsApp voice note locations:
-- `~/Downloads/*.opus`
-- `~/Documents/*.opus`
+Otherwise, use $ARGUMENTS as the file path. If not provided, ask the user.
 
 ### 2. Convert to WAV if needed
 
