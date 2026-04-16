@@ -152,9 +152,9 @@ Prompt the agent with these instructions:
 
 2. The script outputs a distribution table (buckets: <=50, 51-150, 151-300, 301-500, 501-1000, 1001-2000, 2000+) with the largest file.
 
-3. Read `.claude/data/file-sizes.md` for the previous snapshot. Show a delta comparison (only rows that changed).
+3. Read `docs/file-sizes.md` for the previous snapshot. Show a delta comparison (only rows that changed).
 
-4. Save the new snapshot to `.claude/data/file-sizes.md` with today's date.
+4. Save the new snapshot to `docs/file-sizes.md` with today's date.
 
 Tell the agent to report back the tables and any notable changes.
 
