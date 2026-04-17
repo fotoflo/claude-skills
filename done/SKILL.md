@@ -2,6 +2,7 @@
 name: done
 description: Wrap up a coding session — update docs, lint, then commit. Use when the user says "done", "wrap up", or "finish".
 argument-hint: "[optional commit message]"
+model: sonnet
 ---
 
 Wrap up the current coding session.
@@ -80,7 +81,7 @@ Before launching parallel agents, prepare the context they'll need:
 
 ### Parallel Phase: Launch agents for Phases 1-4
 
-**Launch ALL applicable phases as parallel subagents in a single message.** These phases are independent and should run concurrently. Each agent should be given the session file list and enough context to do its work.
+**Launch ALL applicable phases as parallel subagents in a single message.** These phases are independent and should run concurrently. Each agent should be given the session file list and enough context to do its work. **Use `model: "haiku"` for all parallel subagents** — these are mechanical tasks (lint, tests, docs templating) that don't need a heavier model.
 
 Always launch these agents:
 - **Architecture docs agent**
