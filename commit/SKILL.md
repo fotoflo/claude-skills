@@ -26,6 +26,27 @@ Create a git commit for the current changes in /Users/fotoflo/dev/habitcal.
    )"
    ```
 6. Run `git status` to confirm success
+7. **Deploy preview to Vercel (regardless of branch)** — if the project is linked to Vercel (`.vercel/project.json` exists):
+   - Run `vercel --yes` to trigger a preview deploy
+   - Extract the deployment URL from output (line containing `.vercel.app`)
+   - Check if a `preview.<apex>` domain is attached to the project:
+     ```bash
+     VERCEL_TOKEN=$(python3 -c "import json,os; print(json.load(open(os.path.expanduser('~/Library/Application Support/com.vercel.cli/auth.json'))).get('token',''))")
+     PROJECT_ID=$(python3 -c "import json; print(json.load(open('.vercel/project.json')).get('projectId',''))")
+     TEAM_ID=$(python3 -c "import json; print(json.load(open('.vercel/project.json')).get('orgId',''))")
+     curl -s "https://api.vercel.com/v9/projects/${PROJECT_ID}/domains?teamId=${TEAM_ID}" \
+       -H "Authorization: Bearer $VERCEL_TOKEN" | python3 -c "import sys,json; [print(d['name']) for d in json.load(sys.stdin)['domains'] if d['name'].startswith('preview.')]"
+     ```
+   - If a `preview.*` domain exists, alias the deploy to it via API:
+     ```bash
+     curl -s -X POST "https://api.vercel.com/v2/deployments/<DEPLOYMENT_ID>/aliases?teamId=${TEAM_ID}" \
+       -H "Authorization: Bearer $VERCEL_TOKEN" \
+       -H "Content-Type: application/json" \
+       -d '{"alias":"<preview-domain>"}'
+     ```
+   - Report the final preview URL to the user
+   - Do this for ALL branches (not just main) — every commit should push to preview
+   - If deploy fails, report the error but don't block — the commit already succeeded
 
 ## Rules
 
