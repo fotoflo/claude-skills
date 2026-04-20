@@ -16,7 +16,7 @@ Row 3: (CLI's built-in hint row appears automatically)
 
 ### Row 1 — Project context
 - **Directory** (green) — shortened with ~ for home
-- **Git branch** (cyan) — current branch or short SHA
+- **Git branch** (cyan) — current branch or short SHA, with a red `●` when the tree is dirty
 - **Model** (yellow) — opus, sonnet, haiku, etc.
 - **Session name** (white) — if set via /rename
 
@@ -58,7 +58,7 @@ Write this exact content to `~/.claude/statusline-command.sh`:
 #!/bin/sh
 # Claude Code status line
 # Row 1: ~/dir (branch) [model] session-name
-# Row 2: ctx:N%  tok:Nk  +N/-N  │  5hr:N% reset TIME  7d:N% reset DAY TIME
+# Row 2: ctx:N% tok:Nk +N/-N  ║  5hr:N% reset Xam · 7d:N% reset day Xpm
 
 input=$(cat)
 
@@ -74,9 +74,11 @@ dim() { col 90 "$1"; }
 
 jv() { echo "$input" | jq -r "$1"; }
 
+# Join parts with double-space separator
 row=""
 add() { row="${row:+$row  }$1"; }
 
+# Format token count as human-readable
 fmt_tok() {
   if [ "$1" -ge 1000000 ]; then
     awk "BEGIN{printf \"%.1fM\",$1/1000000}"
@@ -87,15 +89,30 @@ fmt_tok() {
   fi
 }
 
+# Color a percentage by remaining budget: high=green, low=red
+pct_color() {
+  _remaining=$(printf '%.0f' "$1")
+  if [ "$_remaining" -ge 60 ]; then
+    col 32 "$2"   # green
+  elif [ "$_remaining" -ge 30 ]; then
+    col 33 "$2"   # yellow
+  else
+    col 31 "$2"   # red
+  fi
+}
+
+# Format rate limit: "LABEL:N% reset TIME" — shows REMAINING, colored
 fmt_limit() {
-  _label="$1" _pct="$2" _at="$3" _datefmt="$4"
-  [ -z "$_pct" ] && return
+  _label="$1" _used="$2" _at="$3" _datefmt="$4"
+  [ -z "$_used" ] && return
+  _remaining=$(printf '%.0f' "$(awk "BEGIN{print 100-$_used}")")
   _reset=""
   [ -n "$_at" ] && _reset=$(date -r "$_at" "+$_datefmt" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+  _colored_pct=$(pct_color "$_remaining" "${_remaining}%")
   if [ -n "$_reset" ]; then
-    mag "$(printf '%s:%.0f%% reset %s' "$_label" "$_pct" "$_reset")"
+    printf '%s:%b %s' "$_label" "$_colored_pct" "$(dim "reset $_reset")"
   else
-    mag "$(printf '%s:%.0f%%' "$_label" "$_pct")"
+    printf '%s:%b' "$_label" "$_colored_pct"
   fi
 }
 
@@ -104,9 +121,13 @@ raw_dir=$(jv '.workspace.current_dir // .cwd // empty')
 short_dir=$(echo "$raw_dir" | sed "s|^$HOME|~|")
 
 branch=""
+dirty=""
 if [ -n "$raw_dir" ] && git -C "$raw_dir" rev-parse --git-dir >/dev/null 2>&1; then
   branch=$(git -C "$raw_dir" --no-optional-locks symbolic-ref --short HEAD 2>/dev/null \
     || git -C "$raw_dir" --no-optional-locks rev-parse --short HEAD 2>/dev/null)
+  if [ -n "$(git -C "$raw_dir" --no-optional-locks status --porcelain 2>/dev/null)" ]; then
+    dirty=" $(red "●")"
+  fi
 fi
 
 model_id=$(jv '.model.id // empty')
@@ -125,18 +146,23 @@ lr=$(jv '.cost.total_lines_removed // 0')
 
 # --- Row 1: project context ---
 row1="$(grn "$short_dir")"
-[ -n "$branch" ]  && row1="$row1 $(cyn "($branch)")"
+[ -n "$branch" ]  && row1="$row1 $(cyn "(")$(cyn "$branch")$dirty$(cyn ")")"
 [ -n "$model" ]   && row1="$row1 $(ylw "[$model]")"
 [ -n "$session" ] && row1="$row1 $(wht "$session")"
 
-# --- Row 2: session usage  │  rate limits ---
-[ -n "$ctx" ]                            && add "$(mag "ctx:${ctx}%")"
+# --- Row 2: session usage  ║  rate limits ---
+
+# Group 1: session usage
+[ -n "$ctx" ]                            && add "ctx:$(pct_color "$ctx" "${ctx}%")"
 [ "$total_tok" -gt 0 ]                   && add "$(cyn "tok:$(fmt_tok $total_tok)")"
 [ "$la" != "0" ] || [ "$lr" != "0" ]     && add "$(grn "+$la")/$(red "-$lr")"
 
+# Separator between groups
 usage="$row"
 row=""
 
+# Group 2: rate limits (same pattern, different time windows)
+# Both show REMAINING — burning down from 100% to 0%
 five=$(fmt_limit "5hr" "$(jv '.rate_limits.five_hour.used_percentage // empty')" \
   "$(jv '.rate_limits.five_hour.resets_at // empty')" "%-I%p")
 seven=$(fmt_limit "7d" "$(jv '.rate_limits.seven_day.used_percentage // empty')" \
@@ -146,6 +172,7 @@ seven=$(fmt_limit "7d" "$(jv '.rate_limits.seven_day.used_percentage // empty')"
 [ -n "$seven" ] && add "$seven"
 limits="$row"
 
+# Combine with visual separator
 row2=""
 if [ -n "$usage" ] && [ -n "$limits" ]; then
   row2="$usage  $(dim "│")  $limits"
@@ -155,6 +182,7 @@ elif [ -n "$limits" ]; then
   row2="$limits"
 fi
 
+# --- Output ---
 if [ -n "$row2" ]; then
   printf '%b\n%b\n' "$row1" "$row2"
 else

@@ -64,9 +64,13 @@ raw_dir=$(jv '.workspace.current_dir // .cwd // empty')
 short_dir=$(echo "$raw_dir" | sed "s|^$HOME|~|")
 
 branch=""
+dirty=""
 if [ -n "$raw_dir" ] && git -C "$raw_dir" rev-parse --git-dir >/dev/null 2>&1; then
   branch=$(git -C "$raw_dir" --no-optional-locks symbolic-ref --short HEAD 2>/dev/null \
     || git -C "$raw_dir" --no-optional-locks rev-parse --short HEAD 2>/dev/null)
+  if [ -n "$(git -C "$raw_dir" --no-optional-locks status --porcelain 2>/dev/null)" ]; then
+    dirty=" $(red "●")"
+  fi
 fi
 
 model_id=$(jv '.model.id // empty')
@@ -85,7 +89,7 @@ lr=$(jv '.cost.total_lines_removed // 0')
 
 # --- Row 1: project context ---
 row1="$(grn "$short_dir")"
-[ -n "$branch" ]  && row1="$row1 $(cyn "($branch)")"
+[ -n "$branch" ]  && row1="$row1 $(cyn "(")$(cyn "$branch")$dirty$(cyn ")")"
 [ -n "$model" ]   && row1="$row1 $(ylw "[$model]")"
 [ -n "$session" ] && row1="$row1 $(wht "$session")"
 
