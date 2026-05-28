@@ -26,6 +26,7 @@ brew bundle --file=~/dev/claude-skills/Brewfile
 | **commit** | Stage and commit with conventional commit messages | `/commit [message]` |
 | **done** | Wrap up a session — update docs, lint, test, commit | `/done [message]` |
 | **frontend-design** | Guide creation of distinctive, production-grade UIs | `/frontend-design` |
+| **handoff** | Compact the conversation into a handoff doc for another agent | `/handoff [next focus]` |
 | **lint-fix** | Run lint and fix violations following project conventions | `/lint-fix [file or area]` |
 | **transcribe** | Transcribe audio files to text using local whisper-cpp | `/transcribe <path> \| dl` |
 | **update-docs** | Update architecture docs based on recent code changes | `/update-docs [area]` |
@@ -47,6 +48,9 @@ Multi-phase session wrap-up. Launches parallel agents for architecture docs, lin
 
 ### frontend-design
 Guides creation of memorable, intentional interfaces with bold aesthetic direction — typography, color, motion, and spatial composition. Avoids generic AI-generated design patterns.
+
+### handoff
+Compacts the current conversation into a markdown handoff document (written to the OS temp dir, not the workspace) so a fresh agent can continue the work. References existing artifacts by path instead of duplicating them, redacts secrets, and suggests follow-up skills. From [mattpocock/skills](https://github.com/mattpocock/skills).
 
 ### lint-fix
 Runs `pnpm lint`, identifies violations (file size, hook extraction, relative imports, unused code), fixes them following layer architecture conventions, and re-runs to confirm.
