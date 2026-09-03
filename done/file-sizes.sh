@@ -5,7 +5,12 @@
 echo "=== File Size Distribution ==="
 
 # Find all source files, excluding noise directories
-FILES=$(find src public docs .claude -type f \( -name '*.tsx' -o -name '*.ts' -o -name '*.js' -o -name '*.jsx' -o -name '*.css' -o -name '*.md' -o -name '*.json' \) 2>/dev/null | grep -v node_modules | grep -v .next | grep -v '/blog/')
+# .claude/worktrees/ is excluded on purpose: those are sibling agent sessions'
+# git worktrees — full checkouts of THIS repo — so counting them tallies the
+# codebase once per live worktree. Before this exclusion they were 76% of the
+# scan (7424 of 9732 files), which both inflated every bucket and made the
+# "largest file" resolve to a worktree path.
+FILES=$(find src public docs .claude -type f \( -name '*.tsx' -o -name '*.ts' -o -name '*.js' -o -name '*.jsx' -o -name '*.css' -o -name '*.md' -o -name '*.json' \) 2>/dev/null | grep -v node_modules | grep -v .next | grep -v '/blog/' | grep -v '\.claude/worktrees/')
 
 TOTAL=0
 OVER_500=0
