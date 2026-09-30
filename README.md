@@ -44,7 +44,7 @@ SSHes to an M2 Mac Mini and runs EAS builds for Android/iOS. Polls for artifacts
 Analyzes staged and unstaged changes, drafts a conventional commit message (feat/fix/chore), stages relevant files, and commits. Never amends or force-pushes.
 
 ### done
-Multi-phase session wrap-up. Launches parallel agents for architecture docs, lint fixes, and tests, then commits everything with a productivity summary and ASCII art celebration.
+Multi-phase session wrap-up. Runs its architecture-docs and tests phases (plus lint fixes and file sizes when they apply) as one parallel batch on the Puku gateway (free, no Anthropic tokens) via the `puku-agent` skill, verifies each agent stayed in its lane and that doc citations match the code, then commits everything with a productivity summary and ASCII art celebration. Falls back to haiku Agent-tool subagents when puku-agent or its credentials are missing. Lint and test scripts take the session files as arguments and prefer the project's own `node_modules/.bin/eslint` and `vitest`.
 
 ### frontend-design
 Guides creation of memorable, intentional interfaces with bold aesthetic direction — typography, color, motion, and spatial composition. Avoids generic AI-generated design patterns.

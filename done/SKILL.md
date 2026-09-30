@@ -7,6 +7,23 @@ model: sonnet
 
 Wrap up the current coding session.
 
+## Context budget (READ FIRST — avoids the "1M context credits" error)
+
+This skill MUST run entirely on standard 200k context (Sonnet/Haiku), never on a
+1M-context model. A 1M-context model bills 1M-context credits and fails with
+"Usage credits required for 1M context" when those credits are off.
+
+- The `model: sonnet` frontmatter pins the orchestration to Sonnet 200k. If you
+  are reading this while on a 1M-context model (e.g. `*-opus-*[1m]`), do NOT run
+  the heavy phases inline — delegate everything to the standard-context subagents
+  below, and tell the user they can re-invoke as "run /done with sonnet 200k" for
+  a fully standard-context run.
+- The parallel phase runs on the Puku gateway (see below), which spends no Anthropic
+  tokens or credits at all. The rule below covers the fallback path.
+- EVERY `Agent` call in this skill MUST pass an explicit `model` (use `"haiku"`).
+  A subagent with no `model` inherits the parent session's model — which on a 1M
+  session means a 1M-context subagent and the credit error. Never omit `model`.
+
 ## Timing & Stats
 
 At the start of EACH phase, run `date +%s` to capture a timestamp. At the end of each phase, capture another timestamp and compute the elapsed time.
@@ -79,20 +96,63 @@ Before launching parallel agents, prepare the context they'll need:
 3. Determine: was a bug fixed this session? (needed to decide if bug-fix doc agent should run)
 4. Determine: were 3+ files modified? (needed to decide if file-sizes agent should run)
 
-### Parallel Phase: Launch agents for Phases 1-4
+### Parallel Phase: Phases 1-4 as one Puku batch
 
-**Launch ALL applicable phases as parallel subagents in a single message.** These phases are independent and should run concurrently. Each agent should be given the session file list and enough context to do its work. **Use `model: "haiku"` for all parallel subagents** — these are mechanical tasks (lint, tests, docs templating) that don't need a heavier model.
+Run the applicable phases as parallel subagents on the Puku gateway, through the
+`puku-agent` skill: one batch, one command. Puku costs nothing and spends no Anthropic
+tokens, and each agent's file reads and test output stay out of your context. Only its
+report comes back.
 
-Always launch these agents:
-- **Architecture docs agent**
-- **Lint fix agent**
-- **Tests agent**
+Use the Agent tool instead (`model: "haiku"`, explicit) only when
+`~/.claude/skills/puku-agent` is missing or the batch fails with a credentials error.
+The phase sections below then become the agents' prompts, unchanged.
 
-Conditionally launch:
-- **Bug fix docs agent** — only if a bug was fixed this session
-- **File sizes agent** — only if 3+ files were modified
+Always run:
+- **Architecture docs**
+- **Tests**
 
-Each agent's prompt should include the full session file list and instructions from its phase below.
+Conditionally run:
+- **Bug fix docs**: only if a bug was fixed this session
+- **File sizes**: only if 3+ files were modified
+- **Lint fix**: first run `.claude/skills/done/lint.sh <session files>` yourself. It's one
+  command. Add the lint task only if it reports errors in session files.
+
+1. **Write one prompt file per phase** in your scratchpad (not the repo). Each one holds:
+   - the session file list;
+   - a paragraph on WHAT changed this session and WHY. The subagent can't see this
+     conversation, and the why exists only there. The docs agents need it most;
+   - the phase's instructions from its section below.
+2. **Write the tasks file** next to them. Drop the entries whose phase doesn't apply, and
+   use absolute `prompt_file` paths:
+   ```json
+   [
+     {"id": "arch-docs",   "model": "opus-4.8",    "tools": "write", "prompt_file": "<dir>/arch-docs.md"},
+     {"id": "bug-fix-doc", "model": "opus-4.8",    "tools": "write", "prompt_file": "<dir>/bug-fix-doc.md"},
+     {"id": "lint",        "model": "puku-ai-2.8", "tools": "bash",  "prompt_file": "<dir>/lint.md"},
+     {"id": "file-sizes",  "model": "puku-ai-2.8", "tools": "bash",  "prompt_file": "<dir>/file-sizes.md"},
+     {"id": "tests",       "model": "opus-4.8",    "tools": "bash",  "prompt_file": "<dir>/tests.md"}
+   ]
+   ```
+3. **Run it from the repo root, in the background** (`run_in_background: true`; a batch
+   takes a few minutes):
+   ```bash
+   node ~/.claude/skills/puku-agent/puku-agent.mjs --batch <dir>/tasks.json --out <dir>/out --workdir . --quiet
+   ```
+4. When it finishes, read `<dir>/out/summary.json` and each `<dir>/out/<id>.md`.
+
+### Verify the batch (before Phase 5)
+
+The reports are leads, not facts, and the Puku models are weaker than you:
+- **Lanes.** Run `git status --short` and compare it with what each agent may touch:
+  docs → `docs/architecture/`, `docs/bug-fixes/`; lint → the session files;
+  file sizes → `docs/file-sizes.md`; tests → nothing. `git diff` anything outside
+  those lanes, and restore it unless it's a fix you'd have made yourself.
+- **Docs.** Read every doc diff. Check each file path, function name, and number it
+  cites against the code, because doc agents invent details. Fix what's wrong
+  yourself. That's cheaper than another round.
+- **Status.** If a phase is `incomplete` or `error`, do it yourself, or rerun just that
+  task with a narrower prompt.
+- **Tests.** A failure report tells you where to look. Fixing it is your job.
 
 ---
 
@@ -118,7 +178,8 @@ Tell the agent to report back what it created/updated.
 
 **Only launch if the session involved fixing a bug.**
 
-Prompt the agent with the bug details and these instructions:
+Prompt the agent with the bug details (symptom, root cause, and the fix, written out from
+this conversation, which the agent can't see) and these instructions:
 
 1. Run `ls docs/bug-fixes/` to find existing reports and determine the next number (e.g., `002`).
 2. Create `docs/bug-fixes/NNN-short-description.md` with:
@@ -136,12 +197,13 @@ Tell the agent to report back the filename it created.
 
 Prompt the agent with the session file list and these instructions:
 
-1. Run `.claude/skills/done/lint.sh` to find ESLint violations.
-2. Fix lint errors **only in the session files** listed.
-3. Re-run `.claude/skills/done/lint.sh` to confirm fixes.
-4. Do NOT fix pre-existing errors in untouched files.
+1. Run `.claude/skills/done/lint.sh <session files>` to find ESLint violations in them.
+2. Fix those errors. Make mechanical fixes only (unused imports, missing hook deps, ordering).
+   If an error needs a design decision, leave it and report it.
+3. Re-run `.claude/skills/done/lint.sh <session files>` to confirm the fixes.
+4. Do NOT touch any file that isn't in the session list.
 
-Tell the agent to report back how many errors were found and fixed.
+Tell the agent to report back how many errors were found and fixed, and which ones it left alone.
 
 #### Agent: File Sizes (Phase 3)
 
@@ -163,9 +225,12 @@ Tell the agent to report back the tables and any notable changes.
 
 Prompt the agent with these instructions:
 
-1. Run `.claude/skills/done/tests.sh` to ensure all tests pass.
-2. If tests fail, investigate and fix before reporting.
-3. Report back: number of test files, tests passed, tests failed, and duration.
+1. Run `.claude/skills/done/tests.sh <session files>`. With vitest, that runs only the tests
+   related to the session files. Otherwise it runs the whole suite.
+2. Do NOT edit any file. If tests fail, read the failing test and the code it exercises,
+   and work out the likely cause.
+3. Report back: number of test files, tests passed, tests failed, and duration. For each
+   failure, give the test name, the first lines of the error, and the likely cause with path:line.
 
 ---
 
@@ -193,9 +258,9 @@ Wait for all parallel agents to complete, then:
      - Docs: 2 updated, 1 created
      - Areas: src/app/workshop, src/app/page.tsx
 
-     Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+     Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
      ```
-3. Run `.claude/skills/done/commit.sh "commit message" file1 file2 ...` with all relevant changed files (including docs, lint fixes, and any test fixes from agents).
+3. Run `.claude/skills/done/commit.sh "commit message" file1 file2 ...` with all relevant changed files: the docs and lint fixes the agents made (after you verified them), plus any test fixes you made.
 4. The script stages, commits, and runs `git status` to confirm everything is clean.
 
 ### Phase 5.5: Sync new skills to user level
