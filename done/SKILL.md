@@ -260,8 +260,8 @@ Wait for all parallel agents to complete, then:
 
      Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
      ```
-3. Run `.claude/skills/done/commit.sh "commit message" file1 file2 ...` with all relevant changed files: the docs and lint fixes the agents made (after you verified them), plus any test fixes you made.
-4. The script stages, commits, and runs `git status` to confirm everything is clean.
+3. Run `.claude/skills/done/commit.sh "commit message" file1 file2 ...` with every file this commit should hold, and nothing else: your session files, the docs and lint fixes the agents made (after you verified them), plus any test fixes you made.
+4. The script runs `git add` on each path (a pathspec commit can't see a new file until it's tracked), then `git commit -- <those paths>`, so the commit holds exactly those files and nothing else that happens to be staged. Several sessions can share one working tree and so one index; a bare `git commit` would take what they staged too. The `git status` it prints afterwards may still show other sessions' work. That's expected: leave it alone, don't commit or reset it.
 
 ### Phase 5.5: Sync new skills to user level
 
@@ -288,5 +288,6 @@ Skip skills that already exist at the user level (don't overwrite — the user-l
 - Match the style of existing docs in `docs/architecture/`
 - Only fix lint errors in files you changed this session — don't go on a codebase-wide cleanup
 - NEVER use `--no-verify`, `--amend`, or force push
+- NEVER run a bare `git commit` or `git reset`. Both act on the whole index, which other sessions may share; commit and unstage by explicit path
 - NEVER commit `.env`, secrets, or credential files
 - Do NOT push unless the user explicitly asks
