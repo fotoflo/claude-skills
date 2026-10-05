@@ -23,9 +23,14 @@ Create a git commit for the current changes in /Users/fotoflo/dev/habitcal.
 
    Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
    EOF
-   )"
+   )" -- <the paths you staged in step 3>
    ```
-6. Run `git status` to confirm success
+   The `-- <paths>` makes the commit take only those files. Without it, `git commit`
+   takes the whole index, including anything another session working in the same
+   tree has staged. Keep `git add` first: a pathspec commit can't see a new file until
+   it is tracked.
+6. Run `git status` to confirm the commit landed. Other sessions' changes may still
+   show as modified or staged; that's expected, so leave them alone
 7. **Deploy preview to Vercel (regardless of branch)** — if the project is linked to Vercel (`.vercel/project.json` exists):
    - Run `vercel --yes` to trigger a preview deploy
    - Extract the deployment URL from output (line containing `.vercel.app`)
@@ -54,4 +59,6 @@ Create a git commit for the current changes in /Users/fotoflo/dev/habitcal.
 - NEVER amend — always create a new commit
 - NEVER commit `.env`, secrets, or credential files
 - NEVER force push
+- NEVER run a bare `git commit` or `git reset`; both act on the whole index, which
+  other sessions may share. Commit and unstage by explicit path
 - Do NOT push unless the user explicitly asks

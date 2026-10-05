@@ -27,7 +27,9 @@ wrote. Then `git status --porcelain` to see the tree.
 **These two lists will differ, and that is the point.** This checkout is often
 shared by several concurrent sessions, so dirty files you do not recognize
 belong to someone else. Never `git add -A`, never `git add .`, never `git
-commit -a`. Stage by explicit path, only your own files.
+commit -a`. Stage by explicit path, only your own files, and commit by those
+same paths: the sessions share one index, and a bare `git commit` takes
+everything in it, including what another session staged a second ago.
 
 Do NOT reconstruct the list from `HEAD~N` or a broad `git diff` — another
 session may have committed in between, and you will sweep up their work.
@@ -100,8 +102,12 @@ non-obvious, name the failure it prevents.
 
 ```
 git add <explicit paths>
-git commit -m "..."
+git commit -m "..." -- <the same paths>
 ```
+
+`git add` still comes first, because a pathspec commit can't see a brand-new
+file until it is tracked. The `-- <paths>` keeps anything else that happens to
+be staged out of your commit.
 
 ## 6. Report — and confirm every metric with the user
 
@@ -173,6 +179,8 @@ No goodbye banner, no celebration block, no markers. The art IS the sign-off.
 - NEVER `--no-verify`, `--amend`, or force push
 - NEVER commit `.env`, secrets, or credentials
 - NEVER stage another session's files
+- NEVER run a bare `git commit` or `git reset`; both act on the whole index.
+  Commit and unstage by explicit path
 - Do NOT push unless the user asks
 - If verification fails and you cannot fix it quickly, commit nothing and say so
 - NEVER report a number you did not measure this run; name the command behind it
