@@ -30,6 +30,7 @@ brew bundle --file=~/dev/claude-skills/Brewfile
 | **lint-fix** | Run lint and fix violations following project conventions | `/lint-fix [file or area]` |
 | **transcribe** | Transcribe audio files to text using local whisper-cpp | `/transcribe <path> \| dl` |
 | **update-docs** | Update architecture docs based on recent code changes | `/update-docs [area]` |
+| **walkthrough** | Tour pages one at a time in the embedded browser, narrated, waiting for "next" | `/walkthrough [topic]` |
 | **weekly** | Summarize the week's commits with highlights and stats | `/weekly [days]` |
 
 ## Skill details
@@ -54,6 +55,9 @@ Compacts the current conversation into a markdown handoff document (written to t
 
 ### lint-fix
 Runs `pnpm lint`, identifies violations (file size, hook extraction, relative imports, unused code), fixes them following layer architecture conventions, and re-runs to confirm.
+
+### walkthrough
+Plans a tour (public page, signed-in page, third-party dashboards), then shows one stop per turn in Claude's built-in browser pane: screenshot, 3–6 bullets on what it is and why, then waits for "next", "back", "skip" or "stop". Keeps a running list of changes requested mid-tour. Knows the pane's realities: its own cookies (production may be signed out; it never types passwords), not starting dev servers other sessions share, dashboards that refuse navigation, never repeating secrets shown on a page, and cleaning up test sessions it made.
 
 ### transcribe
 Converts audio files (opus, ogg, mp3, wav, m4a) to text using local whisper-cpp. Auto-detects language, sorts messages chronologically, and copies output to clipboard via `pbcopy`. Use `dl` to scan `~/Downloads/` for recent audio files. Run `transcribe/setup.sh` to install dependencies and download a whisper model.
