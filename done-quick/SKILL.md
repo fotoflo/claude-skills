@@ -86,8 +86,10 @@ It refuses to run on a path that does not exist, because `vitest related` report
 "No test files found" and exits 0 for a bad path — a green that means nothing.
 
 **Not covered:** `tsc` is project-wide and slow, so this skips it. A type error
-in a file nothing imports will not be caught. Run `tsc --noEmit` yourself for a
-dependency bump, a shared type change, or anything widely imported.
+in a file nothing imports will not be caught. Run `tsc-once` yourself (or the
+project's `pnpm typecheck` if it goes through a lock) for a dependency bump, a
+shared type change, or anything widely imported. Never bare `tsc --noEmit`: other
+threads are checking too, and `tsc-once` waits for theirs and reuses its result.
 
 Run checks one at a time. Concurrent heavy checks swap-spiral this machine and
 produce phantom failures.
